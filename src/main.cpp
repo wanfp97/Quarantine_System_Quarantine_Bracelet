@@ -6,6 +6,8 @@
 #include "RF24.h"
 #include "LowPower.h"
 
+void opened_interrupt_handler();
+void emergency_interrupt_handler();
 void qb_transmit();
 void qb_opened();
 void qb_emergency();
@@ -22,9 +24,8 @@ RF24 nrf24(8, 9); // using pin 8 for the CE pin, and pin 9 for the CSN pin
 
 SoftwareSerial IG(6, 7);     //pin 6 Rx, pin 7 Tx for connecting to IG
 
-bool qb_initialized = 0;
-
-bool opened = 0;
+bool emergency = false;
+bool opened = false;
 
 struct settings{
   uint16_t  channel;
@@ -43,8 +44,8 @@ void setup() {
   IG.begin(9600);
   while(!IG);   //wait until uart port ready
 
-  pinMode(2, INPUT_PULLUP);     //use pin2 for lock
-  pinMode(3, INPUT_PULLUP);     //use pin3 for emergency
+  pinMode(2, INPUT);     //use pin2 for lock    //externally connect to pull up resistor
+  pinMode(3, INPUT);     //use pin3 for emergency   //externally connect to pull up resistor
   pinMode(10, OUTPUT);    // used for buzzer
   digitalWrite(10, LOW);
 
@@ -87,9 +88,6 @@ void setup() {
   char expecting[] = "connect";
 
   delay(100);
-
-  attachInterrupt(digitalPinToInterrupt(2), qb_opened, RISING);
-  attachInterrupt(digitalPinToInterrupt(3), qb_emergency, FALLING);
 
   Retry_sync:
   while(IG.available()<=0);
@@ -224,11 +222,17 @@ void setup() {
   #ifdef DEBUG
     Serial.println(F("Update message sent"));
   #endif
-
-
+  attachInterrupt(digitalPinToInterrupt(2), opened_interrupt_handler, RISING);
+  attachInterrupt(digitalPinToInterrupt(3), emergency_interrupt_handler, FALLING);
 }
 
 void loop() {
+  if(opened){
+    qb_opened();
+  }
+  if(emergency) {
+    qb_emergency();
+  }
   qb_transmit();
   nrf24.powerDown();    
   for(int i = 0; i<37; i++) {     //loop to sleep for 5mins
@@ -237,27 +241,25 @@ void loop() {
 }
 
 void qb_opened() {
+  opened = false;
   qb_msg.status = OPENED;
   #ifdef DEBUG
-    Serial.println(F("Opened interrupt triggered"));
+    Serial.println(F("Opened interrupt executed"));
   #endif 
   digitalWrite(10, HIGH);
   delay(2000);
   digitalWrite(10, LOW);
-  delay(500);
-  qb_transmit();
 }
 
 void qb_emergency() {
+  emergency = false;
   qb_msg.status = EMERGENCY;
   #ifdef DEBUG
-    Serial.println(F("Emergency interrupt triggered"));
+    Serial.println(F("Emergency interrupt executed"));
   #endif 
   digitalWrite(10, HIGH);
   delay(5000);
   digitalWrite(10, LOW);
-  delay(500);
-  qb_transmit();
 }
 
 void qb_transmit() {
@@ -287,3 +289,10 @@ void qb_transmit() {
   nrf24.powerDown();
 }
 
+void opened_interrupt_handler(){
+  opened = true;
+}
+
+void emergency_interrupt_handler() {
+  emergency = true;
+}
