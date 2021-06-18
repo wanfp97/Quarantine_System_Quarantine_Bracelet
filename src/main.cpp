@@ -44,7 +44,7 @@ void setup() {
   while(!IG);   //wait until uart port ready
 
   pinMode(2, INPUT_PULLUP);     //use pin2 for lock
-  pinMode(3, INPUT_PULLUP);     //use pin3 for emergency button
+  pinMode(3, INPUT_PULLUP);     //use pin3 for emergency
   pinMode(10, OUTPUT);    // used for buzzer
   digitalWrite(10, LOW);
 
@@ -62,9 +62,6 @@ void setup() {
     pinMode(i, OUTPUT);
     digitalWrite(i, LOW);
   }
-
-  attachInterrupt(2, qb_opened, RISING);
-  attachInterrupt(3, qb_emergency, FALLING);
 
   ADCSRA = ADCSRA & B01111111;      //disable ADC, set ADEN to 0
   ACSR = B10000000;       //disable analog comparator, set ACD to 1
@@ -88,6 +85,11 @@ void setup() {
 
   char* incoming_str = (char*)malloc(sizeof("connect"));
   char expecting[] = "connect";
+
+  delay(100);
+
+  attachInterrupt(digitalPinToInterrupt(2), qb_opened, RISING);
+  attachInterrupt(digitalPinToInterrupt(3), qb_emergency, FALLING);
 
   Retry_sync:
   while(IG.available()<=0);
@@ -222,6 +224,8 @@ void setup() {
   #ifdef DEBUG
     Serial.println(F("Update message sent"));
   #endif
+
+
 }
 
 void loop() {
@@ -234,17 +238,25 @@ void loop() {
 
 void qb_opened() {
   qb_msg.status = OPENED;
+  #ifdef DEBUG
+    Serial.println(F("Opened interrupt triggered"));
+  #endif 
   digitalWrite(10, HIGH);
   delay(2000);
   digitalWrite(10, LOW);
+  delay(500);
   qb_transmit();
 }
 
 void qb_emergency() {
   qb_msg.status = EMERGENCY;
+  #ifdef DEBUG
+    Serial.println(F("Emergency interrupt triggered"));
+  #endif 
   digitalWrite(10, HIGH);
   delay(5000);
   digitalWrite(10, LOW);
+  delay(500);
   qb_transmit();
 }
 
